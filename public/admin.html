@@ -5,254 +5,321 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin — Panel de Votación</title>
   <script src="/socket.io/socket.io.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --sap-blue: #0070f2;
-      --sap-dark: #003d8f;
-      --sap-light: #e8f2ff;
-      --text: #1d2d3e;
-      --muted: #556b82;
-      --danger: #bb0000;
+      --c1: #0f172a;
+      --c2: #1e293b;
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --accent3: #06b6d4;
+      --gold: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+      --white: #ffffff;
+      --muted: #94a3b8;
+      --border: rgba(255,255,255,0.08);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: '72', 'Helvetica Neue', Arial, sans-serif;
-      background: #f5f8ff;
-      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--c1);
+      color: var(--white);
       min-height: 100vh;
     }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 40% at 20% 0%, rgba(99,102,241,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 30% at 80% 100%, rgba(139,92,246,0.1) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
     header {
-      background: linear-gradient(135deg, #1a1a2e 0%, var(--sap-dark) 100%);
-      color: white;
-      padding: 24px;
+      position: relative;
+      z-index: 1;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      padding: 20px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
     }
-    header h1 { font-size: 1.4rem; }
-    .badge {
-      background: rgba(255,255,255,0.15);
-      border-radius: 20px;
-      padding: 4px 14px;
-      font-size: 0.85rem;
-    }
-    main { max-width: 900px; margin: 32px auto; padding: 0 16px; }
 
-    .stats-row {
+    header .brand { display: flex; align-items: center; gap: 12px; }
+    header .brand .icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+    }
+    header .brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+    header .brand p  { font-size: 0.75rem; color: var(--muted); }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #34d399;
+    }
+    .live-badge .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: livepulse 1.4s ease-in-out infinite;
+    }
+    @keyframes livepulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    /* Auth */
+    .auth-row {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .auth-row label { font-size: 0.82rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .auth-row input {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: white;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .auth-row input:focus { border-color: rgba(99,102,241,0.5); }
+
+    /* Stats */
+    .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 14px;
       margin-bottom: 28px;
     }
     .stat-card {
-      background: white;
-      border-radius: 12px;
-      padding: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
       text-align: center;
-      border: 1px solid #dde7f5;
     }
-    .stat-card .num { font-size: 2.2rem; font-weight: 800; color: var(--sap-blue); }
-    .stat-card .label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+    .stat-card .n {
+      font-size: 2.6rem;
+      font-weight: 900;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, white, #a5b4fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-card .l { font-size: 0.75rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
 
-    .results-table {
-      background: white;
-      border-radius: 14px;
+    /* Results table */
+    .table-wrap {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 18px;
       overflow: hidden;
-      border: 1px solid #dde7f5;
       margin-bottom: 28px;
     }
-    .results-table .row {
+    .table-head {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .table-head h3 { font-size: 0.9rem; font-weight: 600; }
+    .table-head span { font-size: 0.75rem; color: var(--muted); }
+
+    .row {
       display: flex;
       align-items: center;
       gap: 14px;
-      padding: 14px 18px;
-      border-bottom: 1px solid #f0f4fa;
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
       transition: background 0.15s;
     }
-    .results-table .row:last-child { border-bottom: none; }
-    .results-table .row:hover { background: var(--sap-light); }
-    .row .emoji { font-size: 1.4rem; }
+    .row:last-child { border-bottom: none; }
+    .row:hover { background: rgba(255,255,255,0.03); }
+    .row .em { font-size: 1.4rem; }
     .row .info { flex: 1; }
-    .row .info .t { font-weight: 600; font-size: 0.95rem; }
-    .row .info .a { font-size: 0.78rem; color: var(--muted); }
-    .row .bar-wrap { width: 180px; }
-    .row .bar-bg {
-      background: #e5edfa;
-      border-radius: 6px;
-      height: 8px;
-      overflow: hidden;
-    }
-    .row .bar-fill {
-      background: var(--sap-blue);
-      height: 100%;
-      border-radius: 6px;
-      transition: width 0.5s ease;
-    }
-    .row .votes-num {
-      min-width: 40px;
-      text-align: right;
-      font-weight: 700;
-      color: var(--sap-dark);
-    }
+    .row .info .t { font-size: 0.9rem; font-weight: 600; }
+    .row .info .a { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .row .bar-wrap { width: 160px; }
+    .row .bar-bg { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.07); overflow: hidden; }
+    .row .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width 0.5s ease; }
+    .row .vnum { min-width: 36px; text-align: right; font-weight: 800; font-size: 1.1rem; color: white; }
 
-    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    /* Actions */
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+
     button {
-      border: none;
-      border-radius: 8px;
-      padding: 12px 24px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
-    }
-    button:hover { opacity: 0.88; transform: translateY(-1px); }
-    button:active { transform: scale(0.97); }
-    .btn-reveal { background: var(--sap-blue); color: white; font-size: 1.05rem; padding: 14px 28px; }
-    .btn-reset  { background: #f5f8ff; border: 1.5px solid var(--sap-blue); color: var(--sap-blue); }
-    .btn-danger { background: var(--danger); color: white; }
-
-    .key-input {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 20px;
-      background: white;
+      gap: 8px;
+      border: none;
       border-radius: 10px;
-      padding: 14px 18px;
-      border: 1.5px solid #dde7f5;
+      padding: 12px 22px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.12s;
     }
-    .key-input label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
-    .key-input input {
-      border: 1px solid #ccd7eb;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 0.9rem;
-      flex: 1;
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    button:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      font-size: 1rem;
+      padding: 14px 28px;
+      box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted);
+    }
+    .btn-danger {
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.25);
+      color: #fca5a5;
     }
 
+    /* Log */
+    .log-wrap { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .log-head { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
     .log {
-      background: #1a1a2e;
-      color: #7fffd4;
-      border-radius: 10px;
-      padding: 14px;
-      font-family: monospace;
-      font-size: 0.8rem;
-      max-height: 150px;
+      padding: 12px 16px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      color: #4ade80;
+      max-height: 130px;
       overflow-y: auto;
-    }
-    .log p { margin-bottom: 2px; }
-
-    .status-dot {
-      width: 9px; height: 9px;
-      border-radius: 50%;
-      background: #0c0;
-      display: inline-block;
-      margin-right: 6px;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      line-height: 1.7;
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>⚙️ Panel Admin — Votación IA</h1>
-    <div class="badge"><span class="status-dot"></span>En directo</div>
+    <div class="brand">
+      <div class="icon">⚙️</div>
+      <div>
+        <h1>Panel de Administración</h1>
+        <p>Votación — Casos de IA en vuestro dÍA a dÍA</p>
+      </div>
+    </div>
+    <div class="live-badge"><span class="dot"></span> En directo</div>
   </header>
+
   <main>
-    <div class="key-input">
-      <label>Clave admin:</label>
-      <input type="password" id="adminKey" value="admin2024" />
+    <div class="auth-row">
+      <label>🔑 Clave admin</label>
+      <input type="password" id="adminKey" value="admin2024" placeholder="Clave de administrador" />
     </div>
 
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="num" id="totalVotes">0</div>
-        <div class="label">Votos totales</div>
-      </div>
-      <div class="stat-card">
-        <div class="num" id="topVotes">—</div>
-        <div class="label">Votos al líder</div>
-      </div>
-      <div class="stat-card">
-        <div class="num" id="participantes">0</div>
-        <div class="label">Participantes</div>
-      </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="n" id="totalVotes">0</div><div class="l">Votos totales</div></div>
+      <div class="stat-card"><div class="n" id="topVotes">—</div><div class="l">Votos al líder</div></div>
+      <div class="stat-card"><div class="n" id="leadPct">—</div><div class="l">% del líder</div></div>
     </div>
 
-    <div class="results-table" id="resultsTable"></div>
+    <div class="table-wrap">
+      <div class="table-head">
+        <h3>Resultados en tiempo real</h3>
+        <span>Actualización automática</span>
+      </div>
+      <div id="resultsTable"></div>
+    </div>
 
     <div class="actions">
-      <button class="btn-reveal" onclick="doReveal()">🏆 Revelar Resultados</button>
-      <button class="btn-reset"  onclick="doReset()">🔄 Reiniciar Votación</button>
+      <button class="btn-primary" onclick="doReveal()">🏆 Revelar Resultados</button>
+      <button class="btn-secondary" onclick="doReset()">🔄 Reiniciar Votación</button>
     </div>
 
-    <div class="log" id="log"><p>▶ Sistema listo</p></div>
+    <div class="log-wrap">
+      <div class="log-head">📋 Registro de actividad</div>
+      <div class="log" id="log"><div>▶ Sistema listo — esperando votos…</div></div>
+    </div>
   </main>
 
   <script>
     const socket = io();
-    let presentations = [];
-    let voteCounts = {};
-    let revealed = false;
+    let presentations = [], voteCounts = {};
 
     socket.on('state', (data) => {
       presentations = data.presentations;
       presentations.forEach(p => { voteCounts[p.id] = 0; });
       if (data.counts) Object.assign(voteCounts, data.counts);
-      revealed = data.revealed;
       update(data.totalVotes);
     });
 
     socket.on('voteUpdate', ({ totalVotes }) => {
       update(totalVotes);
-      logMsg('🗳️ Nuevo voto recibido — total: ' + totalVotes);
+      log('🗳️ Nuevo voto recibido · Total: ' + totalVotes);
     });
 
     socket.on('reveal', ({ counts }) => {
       Object.assign(voteCounts, counts);
-      revealed = true;
       const total = Object.values(counts).reduce((a,b)=>a+b,0);
       update(total);
-      logMsg('✅ Resultados revelados');
+      log('✅ Resultados revelados a todos los participantes');
     });
 
     socket.on('reset', () => {
       presentations.forEach(p => { voteCounts[p.id] = 0; });
-      revealed = false;
       update(0);
-      logMsg('🔄 Votación reiniciada');
+      log('🔄 Votación reiniciada');
     });
 
     function update(total) {
       document.getElementById('totalVotes').textContent = total;
-      document.getElementById('participantes').textContent = total;
-      const max = Math.max(...Object.values(voteCounts), 1);
-      const top = Math.max(...Object.values(voteCounts));
-      document.getElementById('topVotes').textContent = top > 0 ? top : '—';
-
-      const table = document.getElementById('resultsTable');
-      const sorted = [...presentations].sort((a,b) => (voteCounts[b.id]||0) - (voteCounts[a.id]||0));
-      table.innerHTML = sorted.map(p => {
+      const vals = Object.values(voteCounts);
+      const max = Math.max(...vals, 0);
+      document.getElementById('topVotes').textContent = max > 0 ? max : '—';
+      document.getElementById('leadPct').textContent = total > 0 ? Math.round((max/total)*100) + '%' : '—';
+      const sorted = [...presentations].sort((a,b)=>(voteCounts[b.id]||0)-(voteCounts[a.id]||0));
+      document.getElementById('resultsTable').innerHTML = sorted.map(p => {
         const v = voteCounts[p.id] || 0;
-        const pct = Math.round((v / max) * 100);
+        const pct = max > 0 ? Math.round((v/max)*100) : 0;
         return `
           <div class="row">
-            <div class="emoji">${p.emoji}</div>
-            <div class="info">
-              <div class="t">${p.title}</div>
-              <div class="a">${p.author} · ${p.role}</div>
-            </div>
-            <div class="bar-wrap">
-              <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
-            </div>
-            <div class="votes-num">${v}</div>
-          </div>
-        `;
+            <div class="em">${p.emoji}</div>
+            <div class="info"><div class="t">${p.title}</div><div class="a">${p.author} · ${p.role}</div></div>
+            <div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></div>
+            <div class="vnum">${v}</div>
+          </div>`;
       }).join('');
     }
 
@@ -268,11 +335,11 @@
       socket.emit('reset', { adminKey: key });
     }
 
-    function logMsg(msg) {
-      const log = document.getElementById('log');
+    function log(msg) {
+      const el = document.getElementById('log');
       const t = new Date().toLocaleTimeString('es');
-      log.innerHTML += `<p>[${t}] ${msg}</p>`;
-      log.scrollTop = log.scrollHeight;
+      el.innerHTML += `<div>[${t}] ${msg}</div>`;
+      el.scrollTop = el.scrollHeight;
     }
   </script>
 </body>

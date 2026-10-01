@@ -5,290 +5,509 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vota tu presentación favorita</title>
   <script src="/socket.io/socket.io.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --sap-blue: #0070f2;
-      --sap-dark: #003d8f;
-      --sap-light: #e8f2ff;
-      --text: #1d2d3e;
-      --muted: #556b82;
-      --success: #188918;
-      --card-bg: #fff;
-      --bg: #f5f8ff;
+      --c1: #0f172a;
+      --c2: #1e293b;
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --accent3: #06b6d4;
+      --gold: #f59e0b;
+      --green: #10b981;
+      --white: #ffffff;
+      --muted: #94a3b8;
+      --card-bg: rgba(255,255,255,0.04);
+      --card-border: rgba(255,255,255,0.08);
+      --glow: rgba(99,102,241,0.3);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: '72', 'Helvetica Neue', Arial, sans-serif;
-      background: var(--bg);
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--c1);
+      color: var(--white);
       min-height: 100vh;
-      color: var(--text);
+      overflow-x: hidden;
     }
 
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(99,102,241,0.15) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(6,182,212,0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header */
     header {
-      background: linear-gradient(135deg, var(--sap-dark) 0%, var(--sap-blue) 100%);
-      color: white;
-      padding: 28px 24px 24px;
+      position: relative;
+      z-index: 1;
+      padding: 48px 24px 40px;
       text-align: center;
     }
+
+    .header-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+      margin-bottom: 24px;
+    }
+    .header-tag .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #6366f1;
+      animation: livepulse 1.4s ease-in-out infinite;
+    }
+    @keyframes livepulse {
+      0%,100%{opacity:1;transform:scale(1)}
+      50%{opacity:0.4;transform:scale(1.4)}
+    }
+
     header h1 {
-      font-size: clamp(1.4rem, 4vw, 2rem);
-      font-weight: 700;
-      letter-spacing: -0.3px;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 50%, #67e8f9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
     }
+
     header p {
-      margin-top: 6px;
-      font-size: 1rem;
-      opacity: 0.85;
+      font-size: 1.05rem;
+      color: var(--muted);
+      font-weight: 400;
     }
 
-    .counter-bar {
-      background: rgba(255,255,255,0.15);
-      border-radius: 20px;
-      display: inline-block;
-      padding: 4px 16px;
-      margin-top: 10px;
-      font-size: 0.9rem;
+    .votes-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      transition: all 0.3s;
     }
+    .votes-pill strong { color: white; font-weight: 700; font-size: 1rem; }
 
+    /* Grid */
     main {
-      max-width: 1100px;
-      margin: 32px auto;
-      padding: 0 16px;
+      position: relative;
+      z-index: 1;
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
     }
 
+    /* Cards */
     .card {
-      background: var(--card-bg);
-      border-radius: 14px;
-      border: 2px solid #dde7f5;
-      padding: 22px 18px 18px;
-      cursor: pointer;
-      transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
       position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 28px 24px 24px;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.22s cubic-bezier(.34,1.56,.64,1), border-color 0.22s, box-shadow 0.22s;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.12) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .card:hover:not(.disabled)::before { opacity: 1; }
     .card:hover:not(.disabled) {
-      transform: translateY(-4px);
-      border-color: var(--sap-blue);
-      box-shadow: 0 8px 24px rgba(0,112,242,0.18);
+      transform: translateY(-6px) scale(1.01);
+      border-color: rgba(99,102,241,0.5);
+      box-shadow:
+        0 20px 40px rgba(0,0,0,0.3),
+        0 0 0 1px rgba(99,102,241,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.08);
     }
+
     .card.selected {
-      border-color: var(--sap-blue);
-      background: var(--sap-light);
-      box-shadow: 0 6px 20px rgba(0,112,242,0.22);
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.12);
+      box-shadow:
+        0 16px 40px rgba(99,102,241,0.25),
+        0 0 0 1px rgba(99,102,241,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.12);
     }
-    .card.disabled {
-      cursor: default;
-      opacity: 0.6;
+    .card.selected::before { opacity: 1; }
+    .card.disabled { cursor: default; opacity: 0.4; pointer-events: none; }
+
+    /* Shimmer on hover */
+    .card::after {
+      content: '';
+      position: absolute;
+      top: -100%;
+      left: -60%;
+      width: 60%;
+      height: 300%;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+      transition: left 0.6s ease;
+      pointer-events: none;
     }
-    .card .emoji {
-      font-size: 2rem;
+    .card:hover:not(.disabled)::after { left: 140%; }
+
+    .card-emoji {
+      font-size: 2.4rem;
+      margin-bottom: 14px;
+      display: block;
+      line-height: 1;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
     }
-    .card .title {
+
+    .card-title {
       font-size: 1.05rem;
       font-weight: 700;
-      color: var(--sap-dark);
-      line-height: 1.3;
-    }
-    .card .author {
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .card .role {
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
-    .card .badge-voted {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: var(--sap-blue);
+      letter-spacing: -0.3px;
       color: white;
-      border-radius: 20px;
-      padding: 2px 10px;
-      font-size: 0.72rem;
-      font-weight: 600;
+      line-height: 1.3;
+      margin-bottom: 10px;
     }
 
-    /* Voted state overlay */
+    .card-divider {
+      width: 32px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      border-radius: 2px;
+      margin-bottom: 10px;
+      transition: width 0.3s;
+    }
+    .card:hover:not(.disabled) .card-divider { width: 48px; }
+    .card.selected .card-divider { width: 48px; }
+
+    .card-author { font-size: 0.88rem; font-weight: 600; color: #e2e8f0; }
+    .card-role   { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+
+    .voted-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 100px;
+      padding: 3px 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: white;
+      box-shadow: 0 2px 8px rgba(99,102,241,0.4);
+    }
+
+    /* Voted message */
     .voted-msg {
       display: none;
+      max-width: 520px;
+      margin: 60px auto;
       text-align: center;
-      margin: 40px auto;
-      max-width: 480px;
-      background: white;
-      border-radius: 16px;
-      padding: 36px 24px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
-    .voted-msg .check { font-size: 3rem; }
-    .voted-msg h2 { margin-top: 12px; color: var(--success); font-size: 1.4rem; }
-    .voted-msg p { color: var(--muted); margin-top: 8px; }
-    .voted-msg .selected-title {
-      margin-top: 14px;
-      background: var(--sap-light);
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-weight: 700;
-      color: var(--sap-dark);
-      font-size: 1rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 28px;
+      padding: 48px 36px;
+      backdrop-filter: blur(20px);
     }
 
-    /* REVEAL overlay */
+    .voted-msg .check-ring {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.05));
+      border: 2px solid rgba(16,185,129,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 24px;
+      animation: popIn 0.5s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes popIn {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    .voted-msg h2 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+      color: var(--green);
+    }
+    .voted-msg p { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+
+    .vote-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 24px;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 16px;
+      padding: 14px 20px;
+      font-weight: 700;
+      color: #a5b4fc;
+      font-size: 1rem;
+      letter-spacing: -0.2px;
+    }
+
+    .waiting-dots {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .waiting-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: dotbounce 1.2s ease-in-out infinite;
+    }
+    .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotbounce {
+      0%,80%,100%{transform:translateY(0)}
+      40%{transform:translateY(-6px)}
+    }
+
+    /* REVEAL OVERLAY */
     #revealOverlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: linear-gradient(135deg, var(--sap-dark) 0%, var(--sap-blue) 100%);
+      background: var(--c1);
       z-index: 100;
       overflow-y: auto;
-      padding: 32px 16px;
     }
-    #revealOverlay h2 {
-      text-align: center;
-      color: white;
-      font-size: clamp(1.6rem, 5vw, 2.6rem);
-      margin-bottom: 28px;
+    #revealOverlay::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(99,102,241,0.2) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 80% 100%, rgba(139,92,246,0.15) 0%, transparent 50%);
+      pointer-events: none;
     }
-    .results-grid {
-      max-width: 800px;
+
+    .reveal-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
       margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+      padding: 52px 20px 60px;
     }
+
+    .reveal-header { text-align: center; margin-bottom: 48px; }
+    .reveal-header .trophy { font-size: 3.5rem; display: block; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    .reveal-header h2 {
+      font-size: clamp(2rem, 6vw, 3rem);
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #ffffff, #a5b4fc, #67e8f9);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .reveal-header p { color: var(--muted); margin-top: 8px; }
+
+    .results-list { display: flex; flex-direction: column; gap: 12px; }
+
     .result-row {
-      background: rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 14px 20px;
+      position: relative;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 18px 20px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      opacity: 0;
-      transform: translateX(-30px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-      position: relative;
+      gap: 16px;
       overflow: hidden;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      backdrop-filter: blur(12px);
     }
-    .result-row.show {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    .result-row.show { opacity: 1; transform: translateY(0); }
     .result-row.winner {
-      background: rgba(255,255,255,0.25);
-      border: 2px solid rgba(255,255,255,0.5);
+      background: rgba(99,102,241,0.12);
+      border-color: rgba(99,102,241,0.35);
+      box-shadow: 0 8px 32px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.08);
     }
-    .result-row .bar-fill {
+
+    .result-bar {
       position: absolute;
       left: 0; top: 0; bottom: 0;
-      background: rgba(255,255,255,0.12);
-      transition: width 1s ease;
+      background: linear-gradient(90deg, rgba(99,102,241,0.12), transparent);
+      transition: width 1.2s cubic-bezier(.22,1,.36,1);
       width: 0;
-      border-radius: 12px;
+      pointer-events: none;
     }
-    .result-row .rank {
-      font-size: 1.4rem;
-      font-weight: 800;
-      color: rgba(255,255,255,0.7);
-      min-width: 32px;
+    .result-row.winner .result-bar {
+      background: linear-gradient(90deg, rgba(99,102,241,0.2), transparent);
+    }
+
+    .result-rank {
+      font-size: 1.5rem;
+      min-width: 36px;
+      text-align: center;
       position: relative;
       z-index: 1;
     }
-    .result-row.winner .rank { color: #ffe066; font-size: 1.7rem; }
-    .result-row .info { flex: 1; position: relative; z-index: 1; }
-    .result-row .info .t { font-size: 1rem; font-weight: 700; color: white; }
-    .result-row .info .a { font-size: 0.82rem; color: rgba(255,255,255,0.75); margin-top: 2px; }
-    .result-row .votes-badge {
-      background: rgba(255,255,255,0.2);
-      border-radius: 20px;
-      padding: 4px 14px;
+    .result-info { flex: 1; position: relative; z-index: 1; }
+    .result-info .rt { font-size: 0.98rem; font-weight: 700; color: white; letter-spacing: -0.2px; }
+    .result-info .ra { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+
+    .result-score {
+      position: relative;
+      z-index: 1;
+      text-align: right;
+    }
+    .result-score .num {
+      font-size: 1.6rem;
+      font-weight: 900;
+      letter-spacing: -1px;
       color: white;
-      font-weight: 700;
-      font-size: 1rem;
+    }
+    .result-score .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 1px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .result-row.winner .result-score .num {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .result-pct-bar {
       position: relative;
       z-index: 1;
+      width: 100px;
     }
-    .result-row.winner .votes-badge {
-      background: #ffe066;
-      color: var(--sap-dark);
+    .result-pct-bg {
+      height: 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
     }
-    .confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
+    .result-pct-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width 1.2s cubic-bezier(.22,1,.36,1);
+      width: 0;
+    }
+    .result-row.winner .result-pct-fill {
+      background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    }
+    .result-pct-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 4px; text-align: right; }
+
+    /* Confetti */
+    #confettiCanvas { position: fixed; inset: 0; pointer-events: none; z-index: 200; }
   </style>
 </head>
 <body>
   <header>
-    <h1>🗳️ Casos de IA en vuestro dÍA a dÍA</h1>
+    <div class="header-tag"><span class="dot"></span> Votación en directo</div>
+    <h1>Casos de IA<br>en vuestro dÍA a dÍA</h1>
     <p>Selecciona tu presentación favorita</p>
-    <div class="counter-bar">
-      <span id="totalVotes">0</span> votos registrados
+    <div class="votes-pill">
+      <strong id="totalVotes">0</strong> votos registrados
     </div>
   </header>
 
   <main>
     <div class="grid" id="grid"></div>
     <div class="voted-msg" id="votedMsg">
-      <div class="check">✅</div>
+      <div class="check-ring">✓</div>
       <h2>¡Voto registrado!</h2>
-      <p>Gracias por participar. Los resultados se revelarán al final.</p>
-      <div class="selected-title" id="selectedTitle"></div>
+      <p>Gracias por participar.<br>Los resultados se revelarán al final.</p>
+      <div class="vote-chip">
+        <span id="selectedEmoji"></span>
+        <span id="selectedTitle"></span>
+      </div>
+      <div class="waiting-dots">
+        <span></span><span></span><span></span>
+        &nbsp;Esperando resultados
+      </div>
     </div>
   </main>
 
   <div id="revealOverlay">
-    <h2>🏆 Resultados Finales</h2>
-    <div class="results-grid" id="resultsGrid"></div>
+    <div class="reveal-inner">
+      <div class="reveal-header">
+        <span class="trophy">🏆</span>
+        <h2>Resultados Finales</h2>
+        <p>Gracias a todos por participar</p>
+      </div>
+      <div class="results-list" id="resultsList"></div>
+    </div>
   </div>
 
-  <canvas class="confetti" id="confettiCanvas"></canvas>
+  <canvas id="confettiCanvas"></canvas>
 
   <script>
     const socket = io();
-
     let presentations = [];
     let hasVoted = false;
     let myVoteId = null;
-    const SESSION_KEY = 'voting_session_' + window.location.host;
+    const SESSION_KEY = 'voting_v2_' + window.location.host;
 
     function getOrCreateSession() {
       let s = localStorage.getItem(SESSION_KEY);
       if (!s) {
-        s = 'sess_' + Math.random().toString(36).substr(2, 12) + Date.now();
+        s = 'u_' + Math.random().toString(36).substr(2, 14) + Date.now().toString(36);
         localStorage.setItem(SESSION_KEY, s);
       }
       return s;
     }
     const sessionId = getOrCreateSession();
 
-    const checkVoted = () => localStorage.getItem(SESSION_KEY + '_voted');
-    const markVoted = (id) => {
-      localStorage.setItem(SESSION_KEY + '_voted', id);
-      hasVoted = true;
-      myVoteId = parseInt(id);
-    };
-
     socket.on('state', (data) => {
       presentations = data.presentations;
       document.getElementById('totalVotes').textContent = data.totalVotes;
+      const storedVote = localStorage.getItem(SESSION_KEY + '_voted');
+      if (storedVote) { hasVoted = true; myVoteId = parseInt(storedVote); }
       renderGrid();
-
-      if (data.revealed) {
-        showReveal(data.counts, presentations);
-      }
-
-      const storedVote = checkVoted();
-      if (storedVote) {
-        hasVoted = true;
-        myVoteId = parseInt(storedVote);
-        showVotedMessage(myVoteId);
-      }
+      if (storedVote) showVotedMessage(myVoteId);
+      if (data.revealed) showReveal(data.counts, presentations);
     });
 
     socket.on('voteUpdate', ({ totalVotes }) => {
@@ -296,18 +515,17 @@
     });
 
     socket.on('votedOk', ({ presentationId }) => {
-      markVoted(presentationId);
+      localStorage.setItem(SESSION_KEY + '_voted', presentationId);
+      hasVoted = true; myVoteId = presentationId;
       showVotedMessage(presentationId);
     });
 
     socket.on('alreadyVoted', () => {
-      const stored = checkVoted();
-      if (stored) { hasVoted = true; myVoteId = parseInt(stored); showVotedMessage(myVoteId); }
+      const s = localStorage.getItem(SESSION_KEY + '_voted');
+      if (s) { hasVoted = true; myVoteId = parseInt(s); showVotedMessage(myVoteId); }
     });
 
-    socket.on('reveal', ({ counts, presentations: p }) => {
-      showReveal(counts, p);
-    });
+    socket.on('reveal', ({ counts, presentations: p }) => showReveal(counts, p));
 
     socket.on('reset', () => {
       localStorage.removeItem(SESSION_KEY + '_voted');
@@ -322,71 +540,76 @@
     function renderGrid() {
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
-      presentations.forEach(p => {
+      presentations.forEach((p, i) => {
+        const isSelected = myVoteId === p.id;
         const card = document.createElement('div');
-        card.className = 'card' + (hasVoted && myVoteId !== p.id ? ' disabled' : '') + (myVoteId === p.id ? ' selected' : '');
+        card.className = 'card' + (hasVoted && !isSelected ? ' disabled' : '') + (isSelected ? ' selected' : '');
+        card.style.animationDelay = (i * 60) + 'ms';
         card.innerHTML = `
-          <div class="emoji">${p.emoji}</div>
-          <div class="title">${p.title}</div>
-          <div class="author">${p.author}</div>
-          <div class="role">${p.role}</div>
-          ${myVoteId === p.id ? '<div class="badge-voted">Tu voto ✓</div>' : ''}
+          <span class="card-emoji">${p.emoji}</span>
+          <div class="card-title">${p.title}</div>
+          <div class="card-divider"></div>
+          <div class="card-author">${p.author}</div>
+          <div class="card-role">${p.role}</div>
+          ${isSelected ? '<div class="voted-badge">Tu voto ✓</div>' : ''}
         `;
-        if (!hasVoted) {
-          card.addEventListener('click', () => vote(p.id));
-        }
+        if (!hasVoted) card.addEventListener('click', () => socket.emit('vote', { presentationId: p.id, sessionId }));
         grid.appendChild(card);
       });
-    }
-
-    function vote(id) {
-      socket.emit('vote', { presentationId: id, sessionId });
     }
 
     function showVotedMessage(id) {
       const p = presentations.find(x => x.id === id);
       document.getElementById('grid').style.display = 'none';
-      const msg = document.getElementById('votedMsg');
-      msg.style.display = 'block';
-      if (p) document.getElementById('selectedTitle').textContent = `${p.emoji} ${p.title} — ${p.author}`;
+      document.getElementById('votedMsg').style.display = 'block';
+      if (p) {
+        document.getElementById('selectedEmoji').textContent = p.emoji;
+        document.getElementById('selectedTitle').textContent = p.title + ' — ' + p.author;
+      }
     }
 
     function showReveal(counts, presos) {
-      const overlay = document.getElementById('revealOverlay');
-      overlay.style.display = 'block';
+      document.getElementById('revealOverlay').style.display = 'block';
       document.getElementById('grid').style.display = 'none';
-
-      const sorted = [...presos].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
-      const max = counts[sorted[0].id] || 1;
-      const grid = document.getElementById('resultsGrid');
-      grid.innerHTML = '';
-
+      const sorted = [...presos].sort((a,b) => (counts[b.id]||0) - (counts[a.id]||0));
+      const maxV = Math.max(...sorted.map(p => counts[p.id] || 0), 1);
+      const total = sorted.reduce((s,p) => s + (counts[p.id]||0), 0);
+      const list = document.getElementById('resultsList');
+      list.innerHTML = '';
+      const ranks = ['🥇','🥈','🥉'];
       sorted.forEach((p, idx) => {
         const v = counts[p.id] || 0;
-        const pct = Math.round((v / Math.max(max, 1)) * 100);
+        const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+        const barPct = Math.round((v / maxV) * 100);
         const row = document.createElement('div');
         row.className = 'result-row' + (idx === 0 ? ' winner' : '');
         row.innerHTML = `
-          <div class="bar-fill" id="bar-${p.id}"></div>
-          <div class="rank">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : (idx + 1)}</div>
-          <div class="info">
-            <div class="t">${p.emoji} ${p.title}</div>
-            <div class="a">${p.author} · ${p.role}</div>
+          <div class="result-bar" id="rbar-${p.id}"></div>
+          <div class="result-rank">${ranks[idx] || (idx + 1)}</div>
+          <div class="result-info">
+            <div class="rt">${p.emoji} ${p.title}</div>
+            <div class="ra">${p.author} · ${p.role}</div>
           </div>
-          <div class="votes-badge">${v} ${v === 1 ? 'voto' : 'votos'}</div>
+          <div class="result-pct-bar">
+            <div class="result-pct-bg"><div class="result-pct-fill" id="pctfill-${p.id}"></div></div>
+            <div class="result-pct-lbl">${pct}%</div>
+          </div>
+          <div class="result-score">
+            <div class="num">${v}</div>
+            <div class="lbl">${v === 1 ? 'voto' : 'votos'}</div>
+          </div>
         `;
-        grid.appendChild(row);
-
+        list.appendChild(row);
         setTimeout(() => {
           row.classList.add('show');
           setTimeout(() => {
-            document.getElementById('bar-' + p.id).style.width = pct + '%';
-          }, 200);
-        }, idx * 150);
+            document.getElementById('rbar-' + p.id).style.width = barPct + '%';
+            document.getElementById('pctfill-' + p.id).style.width = '100%';
+          }, 150);
+        }, idx * 120);
       });
-
       if (sorted[0] && (counts[sorted[0].id] || 0) > 0) {
-        setTimeout(launchConfetti, sorted.length * 150 + 600);
+        setTimeout(launchConfetti, sorted.length * 120 + 600);
       }
     }
 
@@ -395,36 +618,38 @@
       const ctx = canvas.getContext('2d');
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      const pieces = Array.from({ length: 120 }, () => ({
+      const colors = ['#6366f1','#8b5cf6','#06b6d4','#f59e0b','#10b981','#f472b6','#fff'];
+      const pieces = Array.from({ length: 150 }, () => ({
         x: Math.random() * canvas.width,
-        y: -10,
-        r: Math.random() * 8 + 4,
-        d: Math.random() * 30 + 15,
-        color: ['#0070f2','#ffe066','#fff','#00c4e0','#003d8f','#f0a500'][Math.floor(Math.random() * 6)],
-        tilt: Math.random() * 10 - 5,
-        tiltAngle: 0,
-        tiltSpeed: Math.random() * 0.1 + 0.04,
+        y: -20 - Math.random() * 100,
+        r: Math.random() * 6 + 3,
+        vx: (Math.random() - 0.5) * 3,
+        vy: Math.random() * 4 + 2,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.15,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        w: Math.random() * 10 + 6,
+        h: Math.random() * 5 + 3,
       }));
-      let angle = 0, frame = 0;
+      let frame = 0;
       function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        angle += 0.01;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
         pieces.forEach(p => {
-          p.tiltAngle += p.tiltSpeed;
-          p.y += (Math.cos(angle + p.d) + 2) * 1.5;
-          p.x += Math.sin(angle) * 1.2;
-          p.tilt = Math.sin(p.tiltAngle) * 12;
-          if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
-          ctx.beginPath();
-          ctx.lineWidth = p.r / 2;
-          ctx.strokeStyle = p.color;
-          ctx.moveTo(p.x + p.tilt + p.r / 4, p.y);
-          ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 4);
-          ctx.stroke();
+          p.y += p.vy;
+          p.x += p.vx + Math.sin(frame * 0.02 + p.r) * 0.5;
+          p.rot += p.rotV;
+          if (p.y > canvas.height) { p.y = -20; p.x = Math.random() * canvas.width; }
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = 0.85;
+          ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+          ctx.restore();
         });
         frame++;
-        if (frame < 300) requestAnimationFrame(draw);
-        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (frame < 350) requestAnimationFrame(draw);
+        else { ctx.clearRect(0,0,canvas.width,canvas.height); }
       }
       draw();
     }

@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const QRCode = require('qrcode');
 
 const app = express();
 const server = http.createServer(app);
@@ -36,6 +37,26 @@ let voterSessions = new Set();  // track voted sessions
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+app.get('/api/qr', async (req, res) => {
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host  = req.headers['x-forwarded-host'] || req.headers.host;
+  const url   = `${proto}://${host}/`;
+  try {
+    const svg = await QRCode.toString(url, {
+      type: 'svg',
+      width: 280,
+      margin: 2,
+      color: { dark: '#0f172a', light: '#ffffff' },
+      errorCorrectionLevel: 'H',
+    });
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(svg);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/api/presentations', (req, res) => {
   res.json(presentations);
