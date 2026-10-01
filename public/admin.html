@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Panel de Votación</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --sap-blue: #0070f2;
+      --sap-dark: #003d8f;
+      --sap-light: #e8f2ff;
+      --text: #1d2d3e;
+      --muted: #556b82;
+      --danger: #bb0000;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: '72', 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f8ff;
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #1a1a2e 0%, var(--sap-dark) 100%);
+      color: white;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.4rem; }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.85rem;
+    }
+    main { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 18px;
+      text-align: center;
+      border: 1px solid #dde7f5;
+    }
+    .stat-card .num { font-size: 2.2rem; font-weight: 800; color: var(--sap-blue); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+    .results-table {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #dde7f5;
+      margin-bottom: 28px;
+    }
+    .results-table .row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid #f0f4fa;
+      transition: background 0.15s;
+    }
+    .results-table .row:last-child { border-bottom: none; }
+    .results-table .row:hover { background: var(--sap-light); }
+    .row .emoji { font-size: 1.4rem; }
+    .row .info { flex: 1; }
+    .row .info .t { font-weight: 600; font-size: 0.95rem; }
+    .row .info .a { font-size: 0.78rem; color: var(--muted); }
+    .row .bar-wrap { width: 180px; }
+    .row .bar-bg {
+      background: #e5edfa;
+      border-radius: 6px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .row .bar-fill {
+      background: var(--sap-blue);
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+    .row .votes-num {
+      min-width: 40px;
+      text-align: right;
+      font-weight: 700;
+      color: var(--sap-dark);
+    }
+
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    button:hover { opacity: 0.88; transform: translateY(-1px); }
+    button:active { transform: scale(0.97); }
+    .btn-reveal { background: var(--sap-blue); color: white; font-size: 1.05rem; padding: 14px 28px; }
+    .btn-reset  { background: #f5f8ff; border: 1.5px solid var(--sap-blue); color: var(--sap-blue); }
+    .btn-danger { background: var(--danger); color: white; }
+
+    .key-input {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      background: white;
+      border-radius: 10px;
+      padding: 14px 18px;
+      border: 1.5px solid #dde7f5;
+    }
+    .key-input label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+    .key-input input {
+      border: 1px solid #ccd7eb;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+
+    .log {
+      background: #1a1a2e;
+      color: #7fffd4;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .log p { margin-bottom: 2px; }
+
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #0c0;
+      display: inline-block;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ Panel Admin — Votación IA</h1>
+    <div class="badge"><span class="status-dot"></span>En directo</div>
+  </header>
+  <main>
+    <div class="key-input">
+      <label>Clave admin:</label>
+      <input type="password" id="adminKey" value="admin2024" />
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="num" id="totalVotes">0</div>
+        <div class="label">Votos totales</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="topVotes">—</div>
+        <div class="label">Votos al líder</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="participantes">0</div>
+        <div class="label">Participantes</div>
+      </div>
+    </div>
+
+    <div class="results-table" id="resultsTable"></div>
+
+    <div class="actions">
+      <button class="btn-reveal" onclick="doReveal()">🏆 Revelar Resultados</button>
+      <button class="btn-reset"  onclick="doReset()">🔄 Reiniciar Votación</button>
+    </div>
+
+    <div class="log" id="log"><p>▶ Sistema listo</p></div>
+  </main>
+
+  <script>
+    const socket = io();
+    let presentations = [];
+    let voteCounts = {};
+    let revealed = false;
+
+    socket.on('state', (data) => {
+      presentations = data.presentations;
+      presentations.forEach(p => { voteCounts[p.id] = 0; });
+      if (data.counts) Object.assign(voteCounts, data.counts);
+      revealed = data.revealed;
+      update(data.totalVotes);
+    });
+
+    socket.on('voteUpdate', ({ totalVotes }) => {
+      update(totalVotes);
+      logMsg('🗳️ Nuevo voto recibido — total: ' + totalVotes);
+    });
+
+    socket.on('reveal', ({ counts }) => {
+      Object.assign(voteCounts, counts);
+      revealed = true;
+      const total = Object.values(counts).reduce((a,b)=>a+b,0);
+      update(total);
+      logMsg('✅ Resultados revelados');
+    });
+
+    socket.on('reset', () => {
+      presentations.forEach(p => { voteCounts[p.id] = 0; });
+      revealed = false;
+      update(0);
+      logMsg('🔄 Votación reiniciada');
+    });
+
+    function update(total) {
+      document.getElementById('totalVotes').textContent = total;
+      document.getElementById('participantes').textContent = total;
+      const max = Math.max(...Object.values(voteCounts), 1);
+      const top = Math.max(...Object.values(voteCounts));
+      document.getElementById('topVotes').textContent = top > 0 ? top : '—';
+
+      const table = document.getElementById('resultsTable');
+      const sorted = [...presentations].sort((a,b) => (voteCounts[b.id]||0) - (voteCounts[a.id]||0));
+      table.innerHTML = sorted.map(p => {
+        const v = voteCounts[p.id] || 0;
+        const pct = Math.round((v / max) * 100);
+        return `
+          <div class="row">
+            <div class="emoji">${p.emoji}</div>
+            <div class="info">
+              <div class="t">${p.title}</div>
+              <div class="a">${p.author} · ${p.role}</div>
+            </div>
+            <div class="bar-wrap">
+              <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+            </div>
+            <div class="votes-num">${v}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function doReveal() {
+      const key = document.getElementById('adminKey').value;
+      if (!confirm('¿Revelar resultados a todos los participantes?')) return;
+      socket.emit('reveal', { adminKey: key });
+    }
+
+    function doReset() {
+      const key = document.getElementById('adminKey').value;
+      if (!confirm('¿Reiniciar la votación? Se borrarán todos los votos.')) return;
+      socket.emit('reset', { adminKey: key });
+    }
+
+    function logMsg(msg) {
+      const log = document.getElementById('log');
+      const t = new Date().toLocaleTimeString('es');
+      log.innerHTML += `<p>[${t}] ${msg}</p>`;
+      log.scrollTop = log.scrollHeight;
+    }
+  </script>
+</body>
+</html>

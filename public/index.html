@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vota tu presentación favorita</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --sap-blue: #0070f2;
+      --sap-dark: #003d8f;
+      --sap-light: #e8f2ff;
+      --text: #1d2d3e;
+      --muted: #556b82;
+      --success: #188918;
+      --card-bg: #fff;
+      --bg: #f5f8ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: '72', 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--sap-dark) 0%, var(--sap-blue) 100%);
+      color: white;
+      padding: 28px 24px 24px;
+      text-align: center;
+    }
+    header h1 {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    header p {
+      margin-top: 6px;
+      font-size: 1rem;
+      opacity: 0.85;
+    }
+
+    .counter-bar {
+      background: rgba(255,255,255,0.15);
+      border-radius: 20px;
+      display: inline-block;
+      padding: 4px 16px;
+      margin-top: 10px;
+      font-size: 0.9rem;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      border: 2px solid #dde7f5;
+      padding: 22px 18px 18px;
+      cursor: pointer;
+      transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+    .card:hover:not(.disabled) {
+      transform: translateY(-4px);
+      border-color: var(--sap-blue);
+      box-shadow: 0 8px 24px rgba(0,112,242,0.18);
+    }
+    .card.selected {
+      border-color: var(--sap-blue);
+      background: var(--sap-light);
+      box-shadow: 0 6px 20px rgba(0,112,242,0.22);
+    }
+    .card.disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+    .card .emoji {
+      font-size: 2rem;
+    }
+    .card .title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--sap-dark);
+      line-height: 1.3;
+    }
+    .card .author {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .card .role {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .card .badge-voted {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--sap-blue);
+      color: white;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    /* Voted state overlay */
+    .voted-msg {
+      display: none;
+      text-align: center;
+      margin: 40px auto;
+      max-width: 480px;
+      background: white;
+      border-radius: 16px;
+      padding: 36px 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .voted-msg .check { font-size: 3rem; }
+    .voted-msg h2 { margin-top: 12px; color: var(--success); font-size: 1.4rem; }
+    .voted-msg p { color: var(--muted); margin-top: 8px; }
+    .voted-msg .selected-title {
+      margin-top: 14px;
+      background: var(--sap-light);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-weight: 700;
+      color: var(--sap-dark);
+      font-size: 1rem;
+    }
+
+    /* REVEAL overlay */
+    #revealOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, var(--sap-dark) 0%, var(--sap-blue) 100%);
+      z-index: 100;
+      overflow-y: auto;
+      padding: 32px 16px;
+    }
+    #revealOverlay h2 {
+      text-align: center;
+      color: white;
+      font-size: clamp(1.6rem, 5vw, 2.6rem);
+      margin-bottom: 28px;
+    }
+    .results-grid {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .result-row {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      opacity: 0;
+      transform: translateX(-30px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .result-row.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .result-row.winner {
+      background: rgba(255,255,255,0.25);
+      border: 2px solid rgba(255,255,255,0.5);
+    }
+    .result-row .bar-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      background: rgba(255,255,255,0.12);
+      transition: width 1s ease;
+      width: 0;
+      border-radius: 12px;
+    }
+    .result-row .rank {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: rgba(255,255,255,0.7);
+      min-width: 32px;
+      position: relative;
+      z-index: 1;
+    }
+    .result-row.winner .rank { color: #ffe066; font-size: 1.7rem; }
+    .result-row .info { flex: 1; position: relative; z-index: 1; }
+    .result-row .info .t { font-size: 1rem; font-weight: 700; color: white; }
+    .result-row .info .a { font-size: 0.82rem; color: rgba(255,255,255,0.75); margin-top: 2px; }
+    .result-row .votes-badge {
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 4px 14px;
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+    .result-row.winner .votes-badge {
+      background: #ffe066;
+      color: var(--sap-dark);
+    }
+    .confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🗳️ Casos de IA en vuestro dÍA a dÍA</h1>
+    <p>Selecciona tu presentación favorita</p>
+    <div class="counter-bar">
+      <span id="totalVotes">0</span> votos registrados
+    </div>
+  </header>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div class="voted-msg" id="votedMsg">
+      <div class="check">✅</div>
+      <h2>¡Voto registrado!</h2>
+      <p>Gracias por participar. Los resultados se revelarán al final.</p>
+      <div class="selected-title" id="selectedTitle"></div>
+    </div>
+  </main>
+
+  <div id="revealOverlay">
+    <h2>🏆 Resultados Finales</h2>
+    <div class="results-grid" id="resultsGrid"></div>
+  </div>
+
+  <canvas class="confetti" id="confettiCanvas"></canvas>
+
+  <script>
+    const socket = io();
+
+    let presentations = [];
+    let hasVoted = false;
+    let myVoteId = null;
+    const SESSION_KEY = 'voting_session_' + window.location.host;
+
+    function getOrCreateSession() {
+      let s = localStorage.getItem(SESSION_KEY);
+      if (!s) {
+        s = 'sess_' + Math.random().toString(36).substr(2, 12) + Date.now();
+        localStorage.setItem(SESSION_KEY, s);
+      }
+      return s;
+    }
+    const sessionId = getOrCreateSession();
+
+    const checkVoted = () => localStorage.getItem(SESSION_KEY + '_voted');
+    const markVoted = (id) => {
+      localStorage.setItem(SESSION_KEY + '_voted', id);
+      hasVoted = true;
+      myVoteId = parseInt(id);
+    };
+
+    socket.on('state', (data) => {
+      presentations = data.presentations;
+      document.getElementById('totalVotes').textContent = data.totalVotes;
+      renderGrid();
+
+      if (data.revealed) {
+        showReveal(data.counts, presentations);
+      }
+
+      const storedVote = checkVoted();
+      if (storedVote) {
+        hasVoted = true;
+        myVoteId = parseInt(storedVote);
+        showVotedMessage(myVoteId);
+      }
+    });
+
+    socket.on('voteUpdate', ({ totalVotes }) => {
+      document.getElementById('totalVotes').textContent = totalVotes;
+    });
+
+    socket.on('votedOk', ({ presentationId }) => {
+      markVoted(presentationId);
+      showVotedMessage(presentationId);
+    });
+
+    socket.on('alreadyVoted', () => {
+      const stored = checkVoted();
+      if (stored) { hasVoted = true; myVoteId = parseInt(stored); showVotedMessage(myVoteId); }
+    });
+
+    socket.on('reveal', ({ counts, presentations: p }) => {
+      showReveal(counts, p);
+    });
+
+    socket.on('reset', () => {
+      localStorage.removeItem(SESSION_KEY + '_voted');
+      hasVoted = false; myVoteId = null;
+      document.getElementById('totalVotes').textContent = '0';
+      document.getElementById('revealOverlay').style.display = 'none';
+      document.getElementById('votedMsg').style.display = 'none';
+      document.getElementById('grid').style.display = '';
+      renderGrid();
+    });
+
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      presentations.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'card' + (hasVoted && myVoteId !== p.id ? ' disabled' : '') + (myVoteId === p.id ? ' selected' : '');
+        card.innerHTML = `
+          <div class="emoji">${p.emoji}</div>
+          <div class="title">${p.title}</div>
+          <div class="author">${p.author}</div>
+          <div class="role">${p.role}</div>
+          ${myVoteId === p.id ? '<div class="badge-voted">Tu voto ✓</div>' : ''}
+        `;
+        if (!hasVoted) {
+          card.addEventListener('click', () => vote(p.id));
+        }
+        grid.appendChild(card);
+      });
+    }
+
+    function vote(id) {
+      socket.emit('vote', { presentationId: id, sessionId });
+    }
+
+    function showVotedMessage(id) {
+      const p = presentations.find(x => x.id === id);
+      document.getElementById('grid').style.display = 'none';
+      const msg = document.getElementById('votedMsg');
+      msg.style.display = 'block';
+      if (p) document.getElementById('selectedTitle').textContent = `${p.emoji} ${p.title} — ${p.author}`;
+    }
+
+    function showReveal(counts, presos) {
+      const overlay = document.getElementById('revealOverlay');
+      overlay.style.display = 'block';
+      document.getElementById('grid').style.display = 'none';
+
+      const sorted = [...presos].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+      const max = counts[sorted[0].id] || 1;
+      const grid = document.getElementById('resultsGrid');
+      grid.innerHTML = '';
+
+      sorted.forEach((p, idx) => {
+        const v = counts[p.id] || 0;
+        const pct = Math.round((v / Math.max(max, 1)) * 100);
+        const row = document.createElement('div');
+        row.className = 'result-row' + (idx === 0 ? ' winner' : '');
+        row.innerHTML = `
+          <div class="bar-fill" id="bar-${p.id}"></div>
+          <div class="rank">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : (idx + 1)}</div>
+          <div class="info">
+            <div class="t">${p.emoji} ${p.title}</div>
+            <div class="a">${p.author} · ${p.role}</div>
+          </div>
+          <div class="votes-badge">${v} ${v === 1 ? 'voto' : 'votos'}</div>
+        `;
+        grid.appendChild(row);
+
+        setTimeout(() => {
+          row.classList.add('show');
+          setTimeout(() => {
+            document.getElementById('bar-' + p.id).style.width = pct + '%';
+          }, 200);
+        }, idx * 150);
+      });
+
+      if (sorted[0] && (counts[sorted[0].id] || 0) > 0) {
+        setTimeout(launchConfetti, sorted.length * 150 + 600);
+      }
+    }
+
+    function launchConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const pieces = Array.from({ length: 120 }, () => ({
+        x: Math.random() * canvas.width,
+        y: -10,
+        r: Math.random() * 8 + 4,
+        d: Math.random() * 30 + 15,
+        color: ['#0070f2','#ffe066','#fff','#00c4e0','#003d8f','#f0a500'][Math.floor(Math.random() * 6)],
+        tilt: Math.random() * 10 - 5,
+        tiltAngle: 0,
+        tiltSpeed: Math.random() * 0.1 + 0.04,
+      }));
+      let angle = 0, frame = 0;
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        angle += 0.01;
+        pieces.forEach(p => {
+          p.tiltAngle += p.tiltSpeed;
+          p.y += (Math.cos(angle + p.d) + 2) * 1.5;
+          p.x += Math.sin(angle) * 1.2;
+          p.tilt = Math.sin(p.tiltAngle) * 12;
+          if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+          ctx.beginPath();
+          ctx.lineWidth = p.r / 2;
+          ctx.strokeStyle = p.color;
+          ctx.moveTo(p.x + p.tilt + p.r / 4, p.y);
+          ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 4);
+          ctx.stroke();
+        });
+        frame++;
+        if (frame < 300) requestAnimationFrame(draw);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      draw();
+    }
+  </script>
+</body>
+</html>
